@@ -5,38 +5,76 @@ Description: >
 
   Sample SAM Template for sqstasks
 
-# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
-    Timeout: 3
+    Timeout: 60
 
 Resources:
+  DefaultQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: "DefaultQueue"
+
   HelloWorldFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Type: AWS::Serverless::Function
     Properties:
       CodeUri: hello_world/
       Handler: app.lambda_handler
       Runtime: python3.6
       Events:
         HelloWorld:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Type: Api
           Properties:
             Path: /hello
             Method: get
 
   ClockFunction:
     Type: AWS::Serverless::Function
+    Properties:
       CodeUri: hello_world/
       Handler: app.clock_handler
       Runtime: python3.6
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref DefaultQueue
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName:
+              !GetAtt DefaultQueue.QueueName
       Events:
         OnTime:
           Type: Schedule
           Properties:
-            Schedule: rate(30 seconds)
+            Schedule: rate(1 minute)
             Name: on-time
             Description: Schedule to keep this running on time
-            Enabled: True
+            Enabled: true
+
+  WorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: hello_world/
+      Handler: app.sqs_handler
+      Runtime: python3.6
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref DefaultQueue
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName:
+              !GetAtt DefaultQueue.QueueName
+        - SQSPollerPolicy:
+            QueueName:
+              !GetAtt DefaultQueue.QueueName
+      Events:
+        SQSMessage:
+          Type: SQS
+          Properties:
+            Queue:
+              !GetAtt DefaultQueue.Arn
+            BatchSize: 1
+            Enabled: true
+
 
 Outputs:
   HelloWorldApi:
@@ -45,6 +83,9 @@ Outputs:
   HelloWorldFunction:
     Description: "Hello World Lambda Function ARN"
     Value: !GetAtt HelloWorldFunction.Arn
+  QueueURL:
+    Description: "URL of new Amazon SQS Queue"
+    Value: !Ref "DefaultQueue"
   ClockFunction:
     Description: "Hello World Lambda Function ARN"
     Value: !GetAtt ClockFunction.Arn

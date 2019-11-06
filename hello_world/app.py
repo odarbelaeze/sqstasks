@@ -1,6 +1,11 @@
+import os
 import json
 
+import boto3
 import requests
+
+sqs = boto3.client("sqs")
+QUEUE_URL = os.environ.get("QUEUE_URL")
 
 
 def lambda_handler(event, context):
@@ -35,12 +40,25 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "message": "hello world",
-            "location": ip.text.replace("\n", "")
-        }),
+        "body": json.dumps(
+            {"message": "hello world", "location": ip.text.replace("\n", "")}
+        ),
     }
 
 
 def clock_handler(event, context):
+    print(json.dumps(event, indent=2))
+
+    response = sqs.send_message(
+        QueueUrl=QUEUE_URL,
+        DelaySeconds=0,
+        MessageBody=json.dumps(
+            {"method": "create_something_something", "kwargs": {"this": "and that"}}
+        ),
+    )
+
+    print('Message:', response)
+
+
+def sqs_handler(event, context):
     print(json.dumps(event, indent=2))
